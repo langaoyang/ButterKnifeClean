@@ -1,6 +1,4 @@
-
 import java.io.File
-import java.io.FileWriter
 
 /**
  * 移除ButterKnife
@@ -21,13 +19,12 @@ object ButterKnifeDealer {
     }
 
 
-
     private val butterKnifeRegex = "^@BindView\\(\\s*\\S*\\)".toRegex()
     private val butterViewRegex = "^(public\\s+|private\\s+|protect\\s+)?[\\w<\\S\\s>]+[\\s]+[\\w]+\\s*;".toRegex()
     private val activityRegex = "[\\s\\S]*extends\\s+BaseActivity[\\s\\S]*".toRegex()
     private val fragmentRegex = "[\\s\\S]*extends\\s+BaseFragment[\\s\\S]*".toRegex()
-    private val spaceRegex =  "\\s".toRegex()
-    private val clickAreaRegex = "@OnClick\\s*\\(".toRegex()
+    private val spaceRegex = "\\s".toRegex()
+    private val clickAreaRegex = "@OnClick\\s*\\([\\s\\S]*".toRegex()
 
     private fun dealFile(file: File) {
 
@@ -39,9 +36,9 @@ object ButterKnifeDealer {
 
                 println(file.name)
                 val beans = ArrayList<LineBean>()
-                var  classType = 0;
+                var classType = 0;
                 val allIndex = ArrayList<Int>()
-
+                var clickAreaBeans  = ArrayList<ClickArea>()
                 val allLines = file.readLines()
 
                 var allText = file.readText()
@@ -69,13 +66,25 @@ object ButterKnifeDealer {
                             else -> {
                                 // 获取regex
 
-
                             }
                         }
+                        if (clickAreaRegex.matches(line.trim())) {
+                            var startIndex = i
+                            var isClickLine = true
+                            var count = 1;
+                            while (isClickLine) {
+                                var s = allLines[startIndex + count]
 
+                                if (s.contains("public")) {
+                                    var endIndex = startIndex + count - 1
+                                    isClickLine = false
+//                                    clickAreaBeans.add(ClickArea(startIndex, endIndex))
 
+                                }
+                                count++
+                            }
 
-
+                        }
 
                         if (butterKnifeRegex.matches(line.trim())) {
 //                            print("$line      =========")
@@ -98,22 +107,41 @@ object ButterKnifeDealer {
                                 allIndex.add(i)
 
                             } else {
-                                println("$line        \n$nextLine          ")
+//                                println("$line        \n$nextLine          ")
                             }
                         }
                     }
                 }
 
 
+                println(beans)
+                println(clickAreaBeans)
+
+                for (clickAreaBean in clickAreaBeans) {
+
+                    var arrayList = ArrayList<ClickBean>()
+                    var sb = StringBuilder()
+                   for (i in clickAreaBean.startLineIndex..clickAreaBean.endLineIndex) {
+                        var line  = allLines[i]
+                        // TODO: 21.7.21 解决注释问题 判断 // /**/
+
+                       if (line.trim().startsWith("//")){
+                           continue
+                        }
+
+                        if (line.trim().startsWith("/*")){
 
 
+                        }
 
+                        sb.append(line)
+                    }
+                    sb.toString().replace(" ", "")
 
-
-
+                }
 
                 if (beans.isNotEmpty()) {
-                    val writer = FileWriter(file.absoluteFile)
+//                    val writer = FileWriter(file.absoluteFile)
 
                     val sb = StringBuilder()
 
@@ -122,7 +150,7 @@ object ButterKnifeDealer {
 
                         if (allIndex.contains(i)) {
 
-                        }else{
+                        } else {
                             sb.append(s).appendLine()
                         }
 
@@ -135,17 +163,21 @@ object ButterKnifeDealer {
                         sb.appendLine()
                         for (bean in beans) {
                             var startLine = bean.startLine
-                            var id  = startLine.substring(startLine.indexOf("(")+1,startLine.indexOf(")"))
+                            var id = startLine.substring(startLine.indexOf("(") + 1, startLine.indexOf(")"))
 
                             var nextLine = bean.nextLine
 
-                            sb.append("${nextLine.trim().replace(spaceRegex," ").split(" ").last().replace(";","")} = findViewById($id);")
+                            sb.append(
+                                "${
+                                    nextLine.trim().replace(spaceRegex, " ").split(" ").last().replace(";", "")
+                                } = findViewById($id);"
+                            )
                             sb.appendLine()
 
                         }
                         sb.append("}")
 
-                    }else if (classType == 2) {
+                    } else if (classType == 2) {
                         sb.append("private void findViewsByButterKnifeDealer(){")
                         sb.appendLine()
                         sb.append("View rootView = getView();")
@@ -154,11 +186,18 @@ object ButterKnifeDealer {
 
                         for (bean in beans) {
                             var startLine = bean.startLine
-                            var id  = startLine.substring(startLine.indexOf("(")+1,startLine.indexOf(")"))
+                            var id = startLine.substring(startLine.indexOf("(") + 1, startLine.indexOf(")"))
 
                             var nextLine = bean.nextLine
 
-                            sb.append("${nextLine.trim().replace(spaceRegex," ").split(" ")[1].replace(";","")} = rootView.findViewById($id);")
+                            sb.append(
+                                "${
+                                    nextLine.trim().replace(spaceRegex, " ").split(" ")[1].replace(
+                                        ";",
+                                        ""
+                                    )
+                                } = rootView.findViewById($id);"
+                            )
                             sb.appendLine()
 
                         }
@@ -166,20 +205,16 @@ object ButterKnifeDealer {
 
                     }
                     sb.append("}")
-                    writer.write(sb.toString())
-
-                    writer.close()
+//                    writer.write(sb.toString())
+//                    writer.flush()
+//                    writer.close()
 
 //                    println(sb.toString())
 
                 }
 
 
-
-
             }
-
-
 
 
         } else {
@@ -207,10 +242,6 @@ object ButterKnifeDealer {
 
 
     }
-
-
-
-
 
 
 }
